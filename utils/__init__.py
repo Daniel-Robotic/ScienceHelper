@@ -8,6 +8,9 @@ from .pdf_parser import (parse_vak_pdf,
 						save_to_json,
 						load_json)
 
+def bool_to_YesNo(element):
+	return "Да" if element else "Нет"
+
 __all__ = [
     "parse_vak_pdf",
     "save_to_json",
@@ -18,10 +21,3 @@ __all__ = [
 	"get_nomenclature_scientific_specialties",
 	"load_json"
 ]
-
-def bool_to_YesNo(element):
-	return "Да" if element else "Нет"
-
-
-
-
