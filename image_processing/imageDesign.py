@@ -410,6 +410,12 @@ class ImagesDesign:
         except IOError:
             self._axis_font = ImageFont.load_default()
 
+    @classmethod
+    def from_images(cls, images: List[Image.Image], **kwargs):
+        obj = cls(images_path='.', **kwargs)
+        obj._images = images
+        return obj
+
     def _load_images(self, folder) -> List[Image.Image]:
         """
         Loads all image files from the specified folder with supported extensions.
@@ -656,14 +662,76 @@ class ImagesDesign:
 
         raise ValueError("layout должен быть 'row', 'column' или 'grid'")
 
-    def preprocessing_image(self, 
-                            index: int) -> Image.Image:
-        
+    def _resize_proportional(self, 
+                             img: Image.Image, 
+                             width: int = None, 
+                             height: int = None) -> Image.Image:
+        """
+        Resize an image proportionally based on the specified width or height.
+
+        This method adjusts the image size while preserving its aspect ratio
+        if only `width` or `height` is provided. If both `width` and `height` are
+        given, the image is resized exactly to that size (aspect ratio may be distorted).
+        If neither is provided, the original image is returned unchanged.
+
+        Args:
+            img (PIL.Image.Image): The input image to be resized.
+            width (int, optional): Target width. If specified alone, height will be adjusted proportionally.
+            height (int, optional): Target height. If specified alone, width will be adjusted proportionally.
+
+        Returns:
+            PIL.Image.Image: A resized image according to the specified dimensions.
+        """
+        w, h = img.size
+
+        if width and not height:
+            ratio = width / w
+            new_size = (width, int(h * ratio))
+        elif height and not width:
+            ratio = height / h
+            new_size = (int(w * ratio), height)
+        elif width and height:
+            new_size = (width, height)
+        else:
+            return img
+
+        return img.resize(new_size, Image.LANCZOS)
+
+    # The implementer method
+    def preprocessing_image(self,
+                            index: int,
+                            width: int = None, 
+                            height: int = None) -> Image.Image:
+        """
+        Process a single image by optional resizing, adding a border, label, and axes.
+
+        This method applies the following transformations to an image at the specified index:
+        1. Resizes the image proportionally if `width` or `height` is provided.
+        2. Adds a border using `_draw_border`.
+        3. Adds a label (signature) if enabled and defined.
+        4. Draws X and Y axes if enabled.
+
+        Args:
+            index (int): Index of the image in the internal image list.
+            width (int, optional): Target width for resizing. Height is scaled proportionally if only width is provided.
+            height (int, optional): Target height for resizing. Width is scaled proportionally if only height is provided.
+
+        Returns:
+            PIL.Image.Image: The processed image.
+
+        Raises:
+            IndexError: If the index is outside the bounds of the image list or a label index is out of range.
+            ValueError: If the signature label is in an unsupported format.
+        """
+
         if index >= len(self._images):
             raise IndexError(f"Index {index} outside the range of the image list")
 
         valid_modes = {m.value for m in LabelMode}
-        proc = self._draw_border(self._images[index])
+        img = self._images[index]
+        if width and height:
+            img = self._resize_proportional(img=img, width=width, height=height)
+        proc = self._draw_border(img)
 
         if self._signature and self._signature_label:
             label_mode = self._signature_label
@@ -689,13 +757,15 @@ class ImagesDesign:
 
         return proc
 
-    # The implementer method
+    
     def united_images(self,
                       layout: Union[str, LayoutMode] = "row",
                       spacing: int = 10,
                       bg_color: str = "white",
                       grid_cols: Optional[int] = None,
-                      grid_rows: Optional[int] = None) -> Image.Image:
+                      grid_rows: Optional[int] = None,
+                      width: int = None, 
+                      height: int = None) -> Image.Image:
 
         """
         Compose and return a single image from a collection of images with optional borders, labels, and axes.
@@ -735,7 +805,7 @@ class ImagesDesign:
 
         images = []
         for i in range(len(self._images)):
-            proc = self.preprocessing_image(i)
+            proc = self.preprocessing_image(i, width=width, height=height)
             images.append(proc)
 
         return self._layout_images(images, layout, spacing, bg_color, grid_cols, grid_rows)

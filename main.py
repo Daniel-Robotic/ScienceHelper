@@ -5,19 +5,19 @@ if __name__ == "__main__":
     design = ImagesDesign(images_path="./images",
                           border_size=10,
                           signature=True,
-                          signature_label="Best",
+                          signature_label=LabelMode.ROMAN,
                           signature_pos=SignaturePosition.TOP_LEFT,
-                          signature_size=(300, 100),
+                          signature_size=(40, 40),
                           signature_color="black",
-                          signature_font_size=50,
-                          draw_axis=False,
+                          signature_font_size=18,
+                          draw_axis=True,
                           axis_labels=(("t", "t", "t", "t"), ("f(x)", "f(y)", "Y(x)", "Z(y)")),
-                          axis_offset=(20, 60),
-                          axis_length=240,
-                          axis_width=5,
+                          axis_offset=25,
+                          axis_length=60,
+                          axis_width=3,
                           font_family="./fonts/Roboto.ttf",
-                          axis_font_size=24)
-    # img = design.united_images(LayoutMode.GRID, grid_cols=3, grid_rows=2)
-    img = design.preprocessing_image(5)
+                          axis_font_size=18)
+    img = design.united_images(LayoutMode.GRID, width=320, height=280)
+    # img = design.preprocessing_image(2, width=320, height=280)
     img.show()
     
