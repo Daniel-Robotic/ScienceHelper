@@ -656,6 +656,39 @@ class ImagesDesign:
 
         raise ValueError("layout должен быть 'row', 'column' или 'grid'")
 
+    def preprocessing_image(self, 
+                            index: int) -> Image.Image:
+        
+        if index >= len(self._images):
+            raise IndexError(f"Index {index} outside the range of the image list")
+
+        valid_modes = {m.value for m in LabelMode}
+        proc = self._draw_border(self._images[index])
+
+        if self._signature and self._signature_label:
+            label_mode = self._signature_label
+            if isinstance(label_mode, (str, LabelMode)) and (getattr(label_mode, 'value', label_mode) in valid_modes):
+                label = get_label(index, label_mode)
+            elif isinstance(label_mode, tuple):
+                if index >= len(label_mode):
+                    raise IndexError(f"The signature for the index {index} was not found in the transmitted tuple")
+                label = label_mode[index]
+            elif isinstance(label_mode, str):
+                label = label_mode
+            else:
+                raise ValueError(f"Incorrect signature format: {label_mode}")
+            proc = self._add_numbering(proc, label)
+
+        if self._draw_axis:
+            label_x, label_y = self._axis_labels
+            if isinstance(label_x, tuple):
+                lx, ly = label_x[index], label_y[index]
+            else:
+                lx, ly = label_x, label_y
+            proc = self._add_axes(proc, lx, ly)
+
+        return proc
+
     # The implementer method
     def united_images(self,
                       layout: Union[str, LayoutMode] = "row",
@@ -698,36 +731,11 @@ class ImagesDesign:
         """
 
         if not self._images:
-            raise ValueError("Список изображений пуст")
+            raise ValueError("The list of images is empty")
 
-        valid_modes = {m.value for m in LabelMode}
         images = []
-
-        for i, img in enumerate(self._images):
-            proc = self._draw_border(img)
-
-            if self._signature and self._signature_label:
-                label_mode = self._signature_label
-                if isinstance(label_mode, (str, LabelMode)) and (getattr(label_mode, 'value', label_mode) in valid_modes):
-                    label = get_label(i, label_mode)
-                elif isinstance(label_mode, tuple):
-                    if i >= len(label_mode):
-                        raise IndexError(f"The signature for the index {i} was not found in the transmitted tuple")
-                    label = label_mode[i]
-                elif isinstance(label_mode, str):
-                    label = label_mode
-                else:
-                    raise ValueError(f"Incorrect signature format: {label_mode}")
-                proc = self._add_numbering(proc, label)
-
-            if self._draw_axis:
-                label_x, label_y = self._axis_labels
-                if isinstance(label_x, tuple):
-                    lx, ly = label_x[i], label_y[i]
-                else:
-                    lx, ly = label_x, label_y
-                proc = self._add_axes(proc, lx, ly)
-
+        for i in range(len(self._images)):
+            proc = self.preprocessing_image(i)
             images.append(proc)
 
         return self._layout_images(images, layout, spacing, bg_color, grid_cols, grid_rows)
