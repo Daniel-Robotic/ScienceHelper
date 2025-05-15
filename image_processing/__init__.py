@@ -3,11 +3,7 @@ from image_processing.enumerates import *
 from image_processing.imageDesign import ImagesDesign
 
 
-__all__ = ["ISOPage", 
-           "PageSeries",
-           "Orientation",
-           "ColorMode",
-           "LayoutMode",
+__all__ = ["LayoutMode",
 		   "LabelMode",
 		   "SignaturePosition",
 		   "ImagesDesign",]

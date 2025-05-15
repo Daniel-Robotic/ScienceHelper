@@ -1,10 +1,9 @@
 import math
-
-from image_processing.enumerates import *
-
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 from PIL import Image, ImageOps, ImageDraw, ImageFont
+
+from image_processing.enumerates import *
 
 
 def to_roman(n: int) -> str:
@@ -24,6 +23,7 @@ def to_roman(n: int) -> str:
         roman += syms[i] * count
         n -= val[i] * count
     return roman
+
 
 def get_label(index: int, mode: str | LabelMode = LabelMode.CYRILLIC_LOWER) -> str:
     mode = mode.value if isinstance(mode, LabelMode) else mode

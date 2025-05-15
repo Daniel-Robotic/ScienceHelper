@@ -1,8 +1,9 @@
-from nicegui import ui
-from PIL import Image
 import io
 import base64
+from PIL import Image
+from nicegui import ui
 from pathlib import Path
+from typing import Tuple, Union
 from tempfile import TemporaryDirectory
 from image_processing import ImagesDesign
 
@@ -67,6 +68,7 @@ def image_processing_page():
                          on_change=lambda e: update_param('border_size', safe_int(e.value), image_slot)).props('type=number')
                 ui.color_input(label='Цвет рамки', value='#000000',
                                on_change=lambda e: update_param('border_fill', e.value, image_slot))
+                
                 ui.checkbox('Добавлять подпись', value=design.signature,
                             on_change=lambda e: update_param('signature', e.value, image_slot))
                 ui.select(signature_label_options, value=design.signature_label,
@@ -85,10 +87,21 @@ def image_processing_page():
                                on_change=lambda e: update_param('signature_color', e.value, image_slot))
                 ui.input('Размер шрифта подписи', value=str(design.signature_font_size),
                          on_change=lambda e: update_param('signature_font_size', safe_int(e.value), image_slot)).props('type=number')
+                
                 ui.checkbox('Показывать оси', value=design.draw_axis,
                             on_change=lambda e: update_param('draw_axis', e.value, image_slot))
-                ui.input('Смещение осей', value=str(design.axis_offset),
-                         on_change=lambda e: update_param('axis_offset', safe_int(e.value), image_slot)).props('type=number')
+                
+                ui.input('Подписи оси X', value=design.axis_labels[0] if isinstance(design.axis_labels[0], str) else ','.join(design.axis_labels[0]),
+                         on_change=lambda e: update_axis_labels('x', e.value, image_slot))
+                ui.input('Подписи оси Y', value=design.axis_labels[1] if isinstance(design.axis_labels[1], str) else ','.join(design.axis_labels[1]),
+                         on_change=lambda e: update_axis_labels('y', e.value, image_slot))
+                
+                ui.input('Смещение по X', value=str(design.axis_offset[0] if isinstance(design.axis_offset, tuple) else design.axis_offset),
+                        on_change=lambda e: update_axis_offset('x', e.value, image_slot)).props('type=number')
+
+                ui.input('Смещение по Y', value=str(design.axis_offset[1] if isinstance(design.axis_offset, tuple) else design.axis_offset),
+                        on_change=lambda e: update_axis_offset('y', e.value, image_slot)).props('type=number')
+
                 ui.input('Длина осей', value=str(design.axis_length),
                          on_change=lambda e: update_param('axis_length', safe_int(e.value), image_slot)).props('type=number')
                 ui.input('Толщина осей', value=str(design.axis_width),
@@ -123,6 +136,52 @@ def image_processing_page():
                 height_input.on('change', lambda e: update_united('height', safe_int(e.args) if e.args else None, image_slot))
 
 # Обработчики
+def update_axis_offset(axis: str, value: str, image_slot):
+    try:
+        offset = int(value)
+        current = design.axis_offset
+        if isinstance(current, int):
+            current = (current, current)
+
+        if axis == 'x':
+            new_offset = (offset, current[1])
+        else:
+            new_offset = (current[0], offset)
+
+        update_param('axis_offset', new_offset, image_slot)
+    except ValueError:
+        ui.notify(f"Смещение по оси {axis.upper()} должно быть числом", type='warning')
+
+
+def update_axis_labels(axis: str, text: str, image_slot):
+    try:
+        values = [v.strip() for v in text.split(',') if v.strip()]
+        if not values:
+            ui.notify(f"Поле оси {axis.upper()} пусто", type='warning')
+            return
+
+        # Если одно значение — это глобальная подпись
+        parsed_value: Union[str, Tuple[str, ...]] = (
+            values[0] if len(values) == 1 else tuple(values)
+        )
+
+        # Проверим длину, если список
+        if isinstance(parsed_value, tuple) and len(parsed_value) != len(design):
+            ui.notify(f"Количество подписей для оси {axis.upper()} должно быть {len(design)}", type='negative')
+            return
+
+        current_x, current_y = design.axis_labels
+        if axis == 'x':
+            design.axis_labels = (parsed_value, current_y)
+        else:
+            design.axis_labels = (current_x, parsed_value)
+
+        update_output(image_slot)
+    except Exception as ex:
+        ui.notify(f"Ошибка при установке подписей осей: {ex}", type='negative')
+
+
+
 
 def handle_upload(e, dialog, image_slot, download_link):
     allowed_ext = ('.png', '.jpg', '.jpeg')

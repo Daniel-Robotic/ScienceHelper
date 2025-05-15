@@ -1,9 +1,8 @@
-
 import asyncio
-from pathlib import Path
 import setting
 
 from nicegui import ui
+from pathlib import Path
 from utils import (
     download_pdf_if_needed,
     get_nomenclature_scientific_specialties,
