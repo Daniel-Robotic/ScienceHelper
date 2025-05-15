@@ -5,7 +5,7 @@ from pages.settings_page import settings_page
 from pages.image_processing_page import image_processing_page
 
 # ────────────────────────────────
-# Глобальное состояние
+# Глобальное состояние check
 # ────────────────────────────────
 data_ready = False
 
