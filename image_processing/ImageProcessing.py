@@ -484,35 +484,20 @@ class ImageProcessing(ABC):
     def _draw_border(self): pass
 
     @abstractmethod
-    def _add_numbering(self, label: Optional[str]): pass
+    def _add_numbering(self): pass
 
     @abstractmethod
-    def _add_axes(self, label_x: str, label_y: str): pass
+    def _add_axes(self): pass
         
     @abstractmethod
-    def _layout_images(self,
-                       layout: Union[str, LayoutMode],
-                       spacing: int,
-                       bg_color: str,
-                       cols: Optional[int],
-                       rows: Optional[int]): pass
+    def _layout_images(self): pass
 
     # The implementer method
     @abstractmethod
-    def preprocessing_image(self,
-                            index: int,
-                            width: int = None, 
-                            height: int = None): pass
+    def preprocessing_image(self): pass
     
     @abstractmethod
-    def united_images(self,
-                      layout: Union[str, LayoutMode] = "row",
-                      spacing: int = 10,
-                      bg_color: str = "white",
-                      grid_cols: Optional[int] = None,
-                      grid_rows: Optional[int] = None,
-                      width: int = None, 
-                      height: int = None): pass
+    def united_images(self): pass
 
     
         
