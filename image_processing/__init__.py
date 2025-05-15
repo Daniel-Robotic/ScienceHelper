@@ -1,6 +1,5 @@
 from __future__ import annotations
 from image_processing.enumerates import *
-from image_processing.isoPage import ISOPage
 from image_processing.imageDesign import ImagesDesign
 
 
