@@ -6,3 +6,5 @@ venv
 data/*.json
 data/*.pdf
 data/*.xlsx
+images/
+.pytest_cache
