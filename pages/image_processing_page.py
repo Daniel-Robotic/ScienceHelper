@@ -5,7 +5,7 @@ from nicegui import ui
 from pathlib import Path
 from typing import Tuple, Union
 from tempfile import TemporaryDirectory
-from image_processing import ImagesDesign
+from image_processing import ImagesDesign, SignaturePosition, LabelMode, LayoutMode
 
 # Хранилище временных параметров компоновки
 united_params = {
@@ -22,7 +22,7 @@ united_params = {
 united_controls = {}
 
 # Допустимые значения layout
-valid_layouts = {'row', 'column', 'grid'}
+valid_layouts = set([mode.value for mode in LayoutMode])
 
 tmp_dir = TemporaryDirectory()
 design = ImagesDesign(images_path=tmp_dir.name)
@@ -30,8 +30,8 @@ design = ImagesDesign(images_path=tmp_dir.name)
 # Список шрифтов
 font_dir = Path('./fonts')
 font_files = sorted([f.stem for f in font_dir.glob('*.ttf') if f.is_file()])
-signature_label_options = ['cyrillic_lower', 'cyrillic_upper', 'latin_lower', 'latin_upper', 'roman']
-signature_pos_options = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+signature_label_options = [mode.value for mode in LabelMode]
+signature_pos_options = [mode.value for mode in SignaturePosition]
 
 def image_processing_page():
     with ui.column().classes('w-full items-center justify-center gap-4'):
@@ -65,7 +65,7 @@ def image_processing_page():
                         return default
 
                 ui.input('Размер рамки', value=str(design.border_size),
-                         on_change=lambda e: update_param('border_size', safe_int(e.value), image_slot)).props('type=number')
+                         on_change=lambda e: update_param('border_size', safe_int(e.value), image_slot)).props('type=number min=0')
                 ui.color_input(label='Цвет рамки', value='#000000',
                                on_change=lambda e: update_param('border_fill', e.value, image_slot))
                 
@@ -80,37 +80,33 @@ def image_processing_page():
                           label='Позиция подписи',
                           on_change=lambda e: update_param('signature_pos', e.value, image_slot))
                 ui.input('Размер подписи (ширина)', value=str(design.signature_size[0]),
-                         on_change=lambda e: update_param('signature_size', (safe_int(e.value), design.signature_size[1]), image_slot)).props('type=number')
+                         on_change=lambda e: update_param('signature_size', (safe_int(e.value), design.signature_size[1]), image_slot)).props('type=number min=0')
                 ui.input('Размер подписи (высота)', value=str(design.signature_size[1]),
-                         on_change=lambda e: update_param('signature_size', (design.signature_size[0], safe_int(e.value)), image_slot)).props('type=number')
+                         on_change=lambda e: update_param('signature_size', (design.signature_size[0], safe_int(e.value)), image_slot)).props('type=number min=0')
                 ui.color_input(label='Цвет подписи (фон)', value='#000',
                                on_change=lambda e: update_param('signature_color', e.value, image_slot))
                 ui.input('Размер шрифта подписи', value=str(design.signature_font_size),
-                         on_change=lambda e: update_param('signature_font_size', safe_int(e.value), image_slot)).props('type=number')
+                         on_change=lambda e: update_param('signature_font_size', safe_int(e.value), image_slot)).props('type=number min=3')
                 
                 ui.checkbox('Показывать оси', value=design.draw_axis,
                             on_change=lambda e: update_param('draw_axis', e.value, image_slot))
-                
                 ui.input('Подписи оси X', value=design.axis_labels[0] if isinstance(design.axis_labels[0], str) else ','.join(design.axis_labels[0]),
                          on_change=lambda e: update_axis_labels('x', e.value, image_slot))
                 ui.input('Подписи оси Y', value=design.axis_labels[1] if isinstance(design.axis_labels[1], str) else ','.join(design.axis_labels[1]),
                          on_change=lambda e: update_axis_labels('y', e.value, image_slot))
-                
                 ui.input('Смещение по X', value=str(design.axis_offset[0] if isinstance(design.axis_offset, tuple) else design.axis_offset),
-                        on_change=lambda e: update_axis_offset('x', e.value, image_slot)).props('type=number')
-
+                        on_change=lambda e: update_axis_offset('x', e.value, image_slot)).props('type=number min=0')
                 ui.input('Смещение по Y', value=str(design.axis_offset[1] if isinstance(design.axis_offset, tuple) else design.axis_offset),
-                        on_change=lambda e: update_axis_offset('y', e.value, image_slot)).props('type=number')
-
+                        on_change=lambda e: update_axis_offset('y', e.value, image_slot)).props('type=number min=0')
                 ui.input('Длина осей', value=str(design.axis_length),
-                         on_change=lambda e: update_param('axis_length', safe_int(e.value), image_slot)).props('type=number')
+                         on_change=lambda e: update_param('axis_length', safe_int(e.value), image_slot)).props('type=number min=1')
                 ui.input('Толщина осей', value=str(design.axis_width),
-                         on_change=lambda e: update_param('axis_width', safe_int(e.value), image_slot)).props('type=number')
+                         on_change=lambda e: update_param('axis_width', safe_int(e.value), image_slot)).props('type=number min=1')
                 ui.input('Размер шрифта осей', value=str(design.axis_font_size),
-                         on_change=lambda e: update_param('axis_font_size', safe_int(e.value), image_slot)).props('type=number')
-                ui.select(font_files or ['Arial'], value=Path(design.font_family).stem,
+                         on_change=lambda e: update_param('axis_font_size', safe_int(e.value), image_slot)).props('type=number min=3')
+                ui.select(font_files or ['Arial'], value=design.font_family,
                           label='Шрифт',
-                          on_change=lambda e: update_param('font_family', f'./fonts/{e.value}.ttf', image_slot))
+                          on_change=lambda e: update_param('font_family', e.value, image_slot))
 
         with ui.expansion('Параметры компоновки', icon='grid_on'):
             with ui.grid(columns=4).classes('gap-4 w-full'):
