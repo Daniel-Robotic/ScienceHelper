@@ -24,12 +24,16 @@ def update_data_status():
 def main_page():
     update_data_status()  # при заходе на страницу проверим наличие данных
 
-    with ui.header():
-        ui.label('Научный хелпер :D').classes('text-xl')
+    with ui.header().classes('items-center justify-between p-4 shadow-md'):
+        with ui.row().classes('items-center gap-4'):
+            with ui.link(target='/'):
+                ui.image('static/logo.png').classes('w-12 h-12')
+            ui.label('Science Helper').classes('text-xl font-bold')
+
 
     with ui.tabs().classes('w-full') as tabs:
         tab1 = ui.tab("Обработчик изображений")
-        tab2 = ui.tab('Анализ')
+        tab2 = ui.tab('Парсинг статей')
         tab3 = ui.tab('Настройки')
 
     with ui.tab_panels(tabs, value=tab1).classes('w-full'):
@@ -49,4 +53,4 @@ def main_page():
             settings_page(update_data_status, science_panel.refresh)
 
 
-ui.run(title="BestScience", dark=False)
+ui.run(title="ScienceHelper", favicon="./static/favicon.ico")

@@ -814,3 +814,4 @@ class ImagesDesign:
         if not isinstance(image, Image.Image):
             raise TypeError("The value must be an instance of PIL.Image.Image")
         self._images.append(image)
+        
