@@ -4,11 +4,12 @@ import pandas as pd
 
 from nicegui import ui
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from utils import filter_rows_by_specialty, bool_to_YesNo, load_json
 
+temp_dir = TemporaryDirectory()
 
 def science_articles_page() -> None:
-    # ─── проверяем, что все нужные файлы есть ─────────────────
     data_dir = Path(setting.MAIN_DIRECTORY) / setting.DATA_DIRECTORY
     req = [data_dir / setting.SPECIALIZATION_NAME,
            data_dir / 'vak_articles.json',
@@ -22,8 +23,6 @@ def science_articles_page() -> None:
         return
 
     taxonomy = json.loads(req[0].read_text(encoding='utf-8'))
-
-    # ─── helper-функции для справочника ────────────────────────
     get_cat = lambda: ['Выбрать...'] + [c['category_name'] for c in taxonomy]
     get_sub = lambda c: ['Выбрать...'] + [s['subcategory_name']
               for s in next((x for x in taxonomy if x['category_name'] == c['label']), {})
@@ -34,17 +33,12 @@ def science_articles_page() -> None:
         sub = next((s for s in c['sub_category'] if s['subcategory_name'] == sub['label']), None) if c else None
         return sub['values'] if sub else []
 
-    # ─── технические утилиты ───────────────────────────────────
     def codes(selected):
         return sorted({'.'.join(s['label'].split('.')[:3]) for s in selected})
 
     def stringify_lists(rows):
-        out = []
-        for r in rows:
-            out.append({k: ', '.join(v) if isinstance(v, list) else v for k, v in r.items()})
-        return out
+        return [{k: ', '.join(v) if isinstance(v, list) else v for k, v in r.items()} for r in rows]
 
-    # ─── UI: выбор категорий / специальностей ───────────────────────
     with ui.column().classes('w-full items-center gap-4'):
         ui.label('Анализ научных журналов').classes('text-xl')
 
@@ -59,7 +53,7 @@ def science_articles_page() -> None:
         tbl_wrap  = ui.column().classes('w-full')
         dl_btn = ui.button('⬇ Скачать Excel').props('color=secondary').classes('mt-2 self-start hidden')
 
-        active = {'btn': None}  # текущая подсвеченная
+        active = {'btn': None}
 
         def highlight(b):
             if active['btn']:
@@ -67,21 +61,15 @@ def science_articles_page() -> None:
             b.props('color=primary').update()
             active['btn'] = b
 
-        # ── отрисовка таблицы + назначение download ────────────
         def show_table(rows, columns, xlsx_path):
             tbl_wrap.clear()
             with tbl_wrap:
-                ui.table(columns=columns,
-                        rows=rows,
-                        pagination=10,
-                        row_key=columns[0]['field']) \
-                .classes('w-full').style('table-layout:fixed;word-break:break-word;')
+                ui.table(columns=columns, rows=rows, pagination=10, row_key=columns[0]['field']) \
+                    .classes('w-full').style('table-layout:fixed;word-break:break-word;')
 
-            # делаем кнопку видимой и переназначаем download
             dl_btn.classes(remove='hidden')
-            dl_btn.on('click', lambda: ui.download(xlsx_path))
+            dl_btn.on('click', lambda: ui.download(str(xlsx_path), filename=xlsx_path.name))
 
-        # ── основной анализ ────────────────────────────────────
         async def run():
             if not specs_selected:
                 ui.notify('Выберите хотя бы одну специализацию'); return
@@ -108,68 +96,53 @@ def science_articles_page() -> None:
                         'RSCI':   bool_to_YesNo(hit['rsci']['value']),
                     })
 
-            # Excel-файлы
-            xlsx_data = data_dir / 'data.xlsx'; pd.DataFrame(data).to_excel(xlsx_data, index=False)
-            xlsx_filters = data_dir / 'filters.xlsx'; pd.DataFrame(vak_filters).to_excel(xlsx_filters, index=False)
-            xlsx_articles = data_dir / 'articles.xlsx'; pd.DataFrame(vak_articles).to_excel(xlsx_articles, index=False)
+            xlsx_data = Path(temp_dir.name) / 'data.xlsx'; pd.DataFrame(data).to_excel(xlsx_data, index=False)
+            xlsx_filters = Path(temp_dir.name) / 'filters.xlsx'; pd.DataFrame(vak_filters).to_excel(xlsx_filters, index=False)
+            xlsx_articles = Path(temp_dir.name) / 'articles.xlsx'; pd.DataFrame(vak_articles).to_excel(xlsx_articles, index=False)
 
             cols_data = [
-                # центр и в заголовке, и в ячейках
                 {'name': 'ВАК ID', 'label': 'ID', 'field': 'ВАК ID',
                 'align': 'center', 'headerClasses': 'text-center',
                 'style': 'width:70px; white-space:normal;'},
 
                 {'name': 'Наименование журнала', 'label': 'Журнал',
-                'field': 'Наименование журнала',
-                'headerClasses': 'text-center',              # заголовок по центру
-                # ячейки по умолчанию left
+                'field': 'Наименование журнала', 'headerClasses': 'text-center',
                 'style': 'max-width:280px; white-space:normal;'},
 
-                # центр и в ячейках, и в заголовке
                 {'name': 'issns', 'label': 'ISSN', 'field': 'issns',
                 'align': 'center', 'headerClasses': 'text-center',
                 'style': 'width:120px; white-space:normal;'},
 
-                {'name': 'Специализации', 'label': 'Специализации',
-                'field': 'Специализации', 'headerClasses': 'text-center',
-                'style': 'max-width:320px; white-space:normal;'},
+                {'name': 'Специализации', 'label': 'Специализации', 'field': 'Специализации',
+                'headerClasses': 'text-center', 'style': 'max-width:320px; white-space:normal;'},
 
-                {'name': 'Уровень журнала', 'label': 'Уровень',
-                'field': 'Уровень журнала', 'headerClasses': 'text-center',
-                'style': 'width:90px;'},
+                {'name': 'Уровень журнала', 'label': 'Уровень', 'field': 'Уровень журнала',
+                'headerClasses': 'text-center', 'style': 'width:90px;'},
 
                 {'name': 'WOS', 'label': 'WOS', 'field': 'WOS',
-                'align': 'center', 'headerClasses': 'text-center',
-                'style': 'width:70px;'},
+                'align': 'center', 'headerClasses': 'text-center', 'style': 'width:70px;'},
 
                 {'name': 'Scopus', 'label': 'Scopus', 'field': 'Scopus',
-                'align': 'center', 'headerClasses': 'text-center',
-                'style': 'width:70px;'},
+                'align': 'center', 'headerClasses': 'text-center', 'style': 'width:70px;'},
 
                 {'name': 'RSCI', 'label': 'RSCI', 'field': 'RSCI',
-                'align': 'center', 'headerClasses': 'text-center',
-                'style': 'width:70px;'},
+                'align': 'center', 'headerClasses': 'text-center', 'style': 'width:70px;'},
             ]
 
             cols_simple = [
                 {'name': 'N', 'label': 'ID', 'field': 'N',
-                'align': 'center', 'headerClasses': 'text-center',
-                'style': 'width:60px;'},
+                'align': 'center', 'headerClasses': 'text-center', 'style': 'width:60px;'},
 
                 {'name': 'title', 'label': 'Название', 'field': 'title',
-                'headerClasses': 'text-center',
-                'style': 'max-width:320px; white-space:normal;'},
+                'headerClasses': 'text-center', 'style': 'max-width:320px; white-space:normal;'},
 
                 {'name': 'issn', 'label': 'ISSN', 'field': 'issn',
-                'align': 'center', 'headerClasses': 'text-center',
-                'style': 'width:120px;'},
+                'align': 'center', 'headerClasses': 'text-center', 'style': 'width:120px;'},
 
                 {'name': 'specialties', 'label': 'Специализации', 'field': 'specialties',
-                'headerClasses': 'text-center',
-                'style': 'max-width:340px; white-space:normal;'},
+                'headerClasses': 'text-center', 'style': 'max-width:340px; white-space:normal;'},
             ]
 
-            # кнопки-переключатели
             with btn_row:
                 b_art = ui.button('ВАК-статьи', on_click=lambda: [show_table(stringify_lists(vak_articles), cols_simple, xlsx_articles), highlight(b_art)]).props('color=secondary')
                 b_flt = ui.button('Фильтр', on_click=lambda: [show_table(stringify_lists(vak_filters), cols_simple, xlsx_filters),  highlight(b_flt)]).props('color=secondary')
@@ -177,9 +150,7 @@ def science_articles_page() -> None:
 
             highlight(b_res)
             show_table(data, cols_data, xlsx_data)
-
             spin.classes(add='hidden'); run_btn.enable()
-
 
         specs_selected: list[dict] = []
 
@@ -187,34 +158,25 @@ def science_articles_page() -> None:
             spec_box.clear()
             if not opts:
                 return
-
             spec_box.classes(remove='hidden')
             run_btn.classes(remove='hidden')
             specs_selected.clear()
-
-            ui.select(
-                opts,
-                label='Научные специальности',
-                multiple=True
-            ).classes('w-96').on(
-                'update:model-value',
-                lambda e: (specs_selected.clear(), specs_selected.extend(e.args))
-    )
+            ui.select(opts, label='Научные специальности', multiple=True).classes('w-96') \
+                .on('update:model-value', lambda e: (specs_selected.clear(), specs_selected.extend(e.args)))
 
         def sub_changed(cat):
             if cat['label'] == 'Выбрать...':
                 sub_box.classes('hidden'); spec_box.clear(); return
             sub_box.classes(remove='hidden'); spec_box.classes(add='hidden'); run_btn.classes(add='hidden')
             sub_box.clear()
-
             def on_sub(e):
                 sub = e.args
                 if sub['label'] == 'Выбрать...':
                     spec_box.clear(); return
                 show_spec(get_specs(cat, sub))
-
             with sub_box:
-                ui.select(get_sub(cat), label='Подкатегория').classes('w-96').on('update:model-value', on_sub)
+                ui.select(get_sub(cat), label='Подкатегория').classes('w-96') \
+                    .on('update:model-value', on_sub)
 
         cat_sel.on('update:model-value', lambda e: sub_changed(e.args))
         run_btn.on('click', run)
