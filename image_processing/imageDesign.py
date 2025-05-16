@@ -157,8 +157,8 @@ class ImagesDesign(ImageProcessing):
         w, h = img.size
 
         # Handle axis_offset as int or tuple
-        offset_x, offset_y = (self.axis_offset, self.axis_offset) \
-            if isinstance(self.axis_offset, int) else self.axis_offset
+        offset_x, offset_y = (self._axis_offset, self._axis_offset) \
+            if isinstance(self._axis_offset, int) else self._axis_offset
 
         arrow_length = self._axis_width * 2.5
         arrow_half =  self._axis_width * 1.2
@@ -166,7 +166,7 @@ class ImagesDesign(ImageProcessing):
         x0, y0 = offset_x, h - offset_y
 
         # X-axis
-        end_x = x0 + self.axis_length - arrow_length
+        end_x = x0 + self._axis_length - arrow_length
         draw.line((x0, y0, end_x, y0), fill="black", width= self._axis_width)
         draw.polygon([
             (end_x + arrow_length, y0),
@@ -298,25 +298,13 @@ class ImagesDesign(ImageProcessing):
             raise IndexError(f"Index {index} outside the range of the image list")
 
         self._load_fonts()
-        valid_modes = {m.value for m in LabelMode}
         img = self._images[index]
         if width and height:
             img = self._resize_proportional(img=img, width=width, height=height)
         proc = self._draw_border(img)
 
         if self._signature and self._signature_label:
-            label_mode = self._signature_label
-            if isinstance(label_mode, (str, LabelMode)) and (getattr(label_mode, 'value', label_mode) in valid_modes):
-                label = get_label(index, label_mode)
-            elif isinstance(label_mode, tuple):
-                if index >= len(label_mode):
-                    raise IndexError(f"The signature for the index {index} was not found in the transmitted tuple")
-                label = label_mode[index]
-            elif isinstance(label_mode, str):
-                label = label_mode
-            else:
-                raise ValueError(f"Incorrect signature format: {label_mode}")
-            proc = self._add_numbering(proc, label)
+            proc = self._add_numbering(proc, self._get_label(index))
 
         if self._draw_axis:
             label_x, label_y = self._axis_labels

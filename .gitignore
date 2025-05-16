@@ -12,4 +12,4 @@ test_code.py
 .pytest_cache
 *.drawio
 *.bkp
-
+*.dtmp

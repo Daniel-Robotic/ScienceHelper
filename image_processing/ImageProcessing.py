@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 from PIL import Image, ImageOps, ImageDraw, ImageFont
@@ -43,7 +42,7 @@ def get_label(index: int, mode: str | LabelMode = LabelMode.CYRILLIC_LOWER) -> s
             raise ValueError(f"Неверный режим: '{mode}'. Доступные режимы: {available}")
         
 
-class ImageProcessing(ABC):
+class ImageProcessing:
 
     def __init__(self,
                  images_path: Union[str, Path],
@@ -411,6 +410,23 @@ class ImageProcessing(ABC):
 
     # Assistant methods
 
+    def _get_label(self, index):
+        valid_modes = {m.value for m in LabelMode}
+
+        label_mode = self._signature_label
+        if isinstance(label_mode, (str, LabelMode)) and (getattr(label_mode, 'value', label_mode) in valid_modes):
+            label = get_label(index, label_mode)
+        elif isinstance(label_mode, tuple):
+            if index >= len(label_mode):
+                raise IndexError(f"The signature for the index {index} was not found in the transmitted tuple")
+            label = label_mode[index]
+        elif isinstance(label_mode, str):
+            label = label_mode
+        else:
+            raise ValueError(f"Incorrect signature format: {label_mode}")
+
+        return label
+
     def _get_positions(self, 
                    image_w: int,
                    image_h: int) -> list | tuple:
@@ -502,23 +518,17 @@ class ImageProcessing(ABC):
             raise TypeError("The value must be an instance of PIL.Image.Image")
         self._images.append(image)
 
-    @abstractmethod
     def _draw_border(self): pass
 
-    @abstractmethod
     def _add_numbering(self): pass
 
-    @abstractmethod
     def _add_axes(self): pass
         
-    @abstractmethod
     def _layout_images(self): pass
 
     # The implementer method
-    @abstractmethod
     def preprocessing_image(self): pass
     
-    @abstractmethod
     def united_images(self): pass
 
     
