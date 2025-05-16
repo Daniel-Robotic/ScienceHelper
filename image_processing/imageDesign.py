@@ -116,27 +116,14 @@ class ImagesDesign(ImageProcessing):
             return img
 
         draw = ImageDraw.Draw(img)
-        w, h = img.size
-        rect_w, rect_h = self._signature_size
-        left, top, right, bottom = self._border_size
+        image_w, image_h = img.size
 
-        positions = {
-            "top-left":     (left, top, left + rect_w, top + rect_h),
-            "top-right":    (w - right - rect_w, top, w - right, top + rect_h),
-            "bottom-left":  (left, h - bottom - rect_w, left + rect_w, h - bottom),
-            "bottom-right": (w - right - rect_w, h - bottom - rect_h, w - right, h - bottom),
-        }
+        rect_position = self._get_positions(image_w, image_h)
 
-        key = self._signature_pos.value if isinstance(self._signature_pos, SignaturePosition) else self._signature_pos
-        rect = positions.get(key)
-
-        if not rect:
-            raise ValueError("rect_corner должен быть одним из: top-left, top-right, bottom-left, bottom-right")
-
-        draw.rectangle(rect, fill=self._signature_color)
+        draw.rectangle(rect_position, fill=self._signature_color)
 
         text_w, text_h = draw.textbbox((0, 0), label, font=self._signature_font)[2:]
-        x0, y0, x1, y1 = rect
+        x0, y0, x1, y1 = rect_position
         cx = x0 + (x1 - x0 - text_w) // 2
         cy = y0 + (y1 - y0 - text_h) // 2
         draw.text((cx, cy), label, font=self._signature_font, fill=self._signature_label_color)

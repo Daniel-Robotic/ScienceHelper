@@ -410,6 +410,28 @@ class ImageProcessing(ABC):
         self._font_family = self._validate_font_family(value)
 
     # Assistant methods
+
+    def _get_positions(self, 
+                   image_w: int,
+                   image_h: int) -> list | tuple:
+        
+        rect_w, rect_h = self._signature_size
+        left, top, right, bottom = self._border_size
+        positions = {
+            "top-left":     (left, top, left + rect_w, top + rect_h),
+            "top-right":    (image_w - right - rect_w, top, image_w - right, top + rect_h),
+            "bottom-left":  (left, image_h - bottom - rect_h, left + rect_w, image_h - bottom),
+            "bottom-right": (image_w - right - rect_w, image_h - bottom - rect_h, image_w - right, image_h - bottom),
+        }
+
+        key = self._signature_pos.value if isinstance(self._signature_pos, SignaturePosition) else self._signature_pos
+        rect_position = positions.get(key)
+
+        if not rect_position:
+            raise ValueError("rect_corner должен быть одним из: top-left, top-right, bottom-left, bottom-right")
+
+        return rect_position
+
     def _load_images(self, folder) -> List[Image.Image]:
         """
         Loads all image files from the specified folder with supported extensions.
