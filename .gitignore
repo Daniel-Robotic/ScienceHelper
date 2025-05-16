@@ -7,4 +7,9 @@ data/*.json
 data/*.pdf
 data/*.xlsx
 images/
+
+test_code.py
 .pytest_cache
+*.drawio
+*.bkp
+*.dtmp
