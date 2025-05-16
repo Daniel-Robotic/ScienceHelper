@@ -1,13 +1,14 @@
 import io
 import base64
+import xml.etree.ElementTree as ET
+
 from PIL import Image
 from nicegui import ui
 from pathlib import Path
 from typing import Tuple, Union
 from tempfile import TemporaryDirectory
-from image_processing import ImagesDesign, SignaturePosition, LabelMode, LayoutMode
+from image_processing import ImagesDesign, SignaturePosition, LabelMode, LayoutMode, DrawioImageDesign
 
-# Хранилище временных параметров компоновки
 united_params = {
     'layout': 'row',
     'spacing': 10,
@@ -18,20 +19,20 @@ united_params = {
     'height': None,
 }
 
-# UI state variables для хранения ссылок на input элементы
 united_controls = {}
 
-# Допустимые значения layout
 valid_layouts = set([mode.value for mode in LayoutMode])
 
 tmp_dir = TemporaryDirectory()
 design = ImagesDesign(images_path=tmp_dir.name)
 
-# Список шрифтов
 font_dir = Path('./fonts')
 font_files = sorted([f.stem for f in font_dir.glob('*.ttf') if f.is_file()])
 signature_label_options = [mode.value for mode in LabelMode]
 signature_pos_options = [mode.value for mode in SignaturePosition]
+
+download_link = ui.html('').classes('hidden')
+download_drawio_link = ui.html('').classes('hidden')
 
 def image_processing_page():
     with ui.column().classes('w-full items-center justify-center gap-4'):
@@ -48,14 +49,14 @@ def image_processing_page():
         with ui.row().classes('gap-4'):
             ui.button('📤 Загрузить', on_click=upload_dialog.open).props('color=primary')
             ui.button('🗑 Очистить', on_click=lambda: clear_images(image_slot)).props('color=negative')
-            ui.button('📥 Скачать результат',
-                      on_click=lambda: ui.run_javascript('document.getElementById("download_result").click();')) \
+            ui.button('📥 Скачать .png', on_click=download_png).props('color=primary') \
                 .bind_visibility_from(image_slot, 'visible')
+            ui.button('📥 Скачать .drawio', on_click=download_drawio).props('color=accent') \
+                        .bind_visibility_from(image_slot, 'visible')
 
-        global download_link
-        download_link = ui.html('').classes('hidden')
+        download_link
+        download_drawio_link
 
-        # Параметры обработки
         with ui.expansion('Параметры обработки', icon='settings'):
             with ui.grid(columns=4).classes('gap-4 w-full'):
                 def safe_int(val, default=0):
@@ -64,11 +65,18 @@ def image_processing_page():
                     except ValueError:
                         return default
 
+                def safe_font(val: str, fallback: int = 12) -> int:
+                    v = safe_int(val, fallback)
+                    if v <= 0:
+                        ui.notify("Размер шрифта должен быть положительным", type="warning")
+                        return fallback
+                    return v
+
                 ui.input('Размер рамки', value=str(design.border_size),
                          on_change=lambda e: update_param('border_size', safe_int(e.value), image_slot)).props('type=number min=0')
                 ui.color_input(label='Цвет рамки', value='#000000',
                                on_change=lambda e: update_param('border_fill', e.value, image_slot))
-                
+
                 ui.checkbox('Добавлять подпись', value=design.signature,
                             on_change=lambda e: update_param('signature', e.value, image_slot))
                 ui.select(signature_label_options, value=design.signature_label,
@@ -87,7 +95,7 @@ def image_processing_page():
                                on_change=lambda e: update_param('signature_color', e.value, image_slot))
                 ui.input('Размер шрифта подписи', value=str(design.signature_font_size),
                          on_change=lambda e: update_param('signature_font_size', safe_int(e.value), image_slot)).props('type=number min=3')
-                
+
                 ui.checkbox('Показывать оси', value=design.draw_axis,
                             on_change=lambda e: update_param('draw_axis', e.value, image_slot))
                 ui.input('Подписи оси X', value=design.axis_labels[0] if isinstance(design.axis_labels[0], str) else ','.join(design.axis_labels[0]),
@@ -95,9 +103,9 @@ def image_processing_page():
                 ui.input('Подписи оси Y', value=design.axis_labels[1] if isinstance(design.axis_labels[1], str) else ','.join(design.axis_labels[1]),
                          on_change=lambda e: update_axis_labels('y', e.value, image_slot))
                 ui.input('Смещение по X', value=str(design.axis_offset[0] if isinstance(design.axis_offset, tuple) else design.axis_offset),
-                        on_change=lambda e: update_axis_offset('x', e.value, image_slot)).props('type=number min=0')
+                         on_change=lambda e: update_axis_offset('x', e.value, image_slot)).props('type=number min=0')
                 ui.input('Смещение по Y', value=str(design.axis_offset[1] if isinstance(design.axis_offset, tuple) else design.axis_offset),
-                        on_change=lambda e: update_axis_offset('y', e.value, image_slot)).props('type=number min=0')
+                         on_change=lambda e: update_axis_offset('y', e.value, image_slot)).props('type=number min=0')
                 ui.input('Длина осей', value=str(design.axis_length),
                          on_change=lambda e: update_param('axis_length', safe_int(e.value), image_slot)).props('type=number min=1')
                 ui.input('Толщина осей', value=str(design.axis_width),
@@ -148,7 +156,6 @@ def update_axis_offset(axis: str, value: str, image_slot):
     except ValueError:
         ui.notify(f"Смещение по оси {axis.upper()} должно быть числом", type='warning')
 
-
 def update_axis_labels(axis: str, text: str, image_slot):
     try:
         values = [v.strip() for v in text.split(',') if v.strip()]
@@ -156,12 +163,10 @@ def update_axis_labels(axis: str, text: str, image_slot):
             ui.notify(f"Поле оси {axis.upper()} пусто", type='warning')
             return
 
-        # Если одно значение — это глобальная подпись
         parsed_value: Union[str, Tuple[str, ...]] = (
             values[0] if len(values) == 1 else tuple(values)
         )
 
-        # Проверим длину, если список
         if isinstance(parsed_value, tuple) and len(parsed_value) != len(design):
             ui.notify(f"Количество подписей для оси {axis.upper()} должно быть {len(design)}", type='negative')
             return
@@ -175,9 +180,6 @@ def update_axis_labels(axis: str, text: str, image_slot):
         update_output(image_slot)
     except Exception as ex:
         ui.notify(f"Ошибка при установке подписей осей: {ex}", type='negative')
-
-
-
 
 def handle_upload(e, dialog, image_slot, download_link):
     allowed_ext = ('.png', '.jpg', '.jpeg')
@@ -231,3 +233,64 @@ def update_output(image_slot):
     download_link.set_content(f'''
         <a id="download_result" download="result.png" href="data:image/png;base64,{b64}"></a>
     ''')
+
+def download_png():
+    if not len(design):
+        ui.notify("Нет изображений для сохранения", type="warning")
+        return
+
+    try:
+        result = design.united_images(
+            layout=united_params['layout'],
+            spacing=united_params['spacing'],
+            bg_color=united_params['bg_color'],
+            grid_cols=united_params['grid_cols'],
+            grid_rows=united_params['grid_rows'],
+            width=united_params['width'],
+            height=united_params['height'],
+        )
+        output_path = Path(tmp_dir.name) / "result.png"
+        result.save(output_path, format="PNG")
+        ui.download(str(output_path), filename="result.png")
+    except Exception as e:
+        ui.notify(f"Ошибка при сохранении PNG: {e}", type="negative")
+
+def download_drawio():
+
+    if not len(design):
+        ui.notify("Нет изображений для сохранения", type="warning")
+        return
+    try:
+        drawio = DrawioImageDesign(images_path=tmp_dir.name)
+        drawio._images = design._images.copy()
+
+        drawio.border_size = design.border_size
+        drawio.border_fill = design.border_fill
+        drawio.signature = design.signature
+        drawio.signature_label = design.signature_label
+        drawio.signature_label_color = design.signature_label_color
+        drawio.signature_color = design.signature_color
+        drawio.signature_font_size = design.signature_font_size
+        drawio.signature_size = design.signature_size
+        drawio.signature_pos = design.signature_pos
+        drawio.axis_labels = design.axis_labels
+        drawio.axis_length = design.axis_length
+        drawio.axis_width = design.axis_width
+        drawio.axis_font_size = design.axis_font_size
+        drawio.axis_offset = design.axis_offset
+        drawio.font_family = design.font_family
+        drawio.draw_axis = design.draw_axis
+
+        output_path = Path(tmp_dir.name) / "result.drawio"
+
+        drawio.export_to_drawio(file=output_path,
+                                layout=united_params['layout'],
+                                spacing=united_params['spacing'],
+                                grid_cols=united_params['grid_cols'],
+                                grid_rows=united_params['grid_rows'],
+                                width=united_params['width'],
+                                height=united_params['height'])
+
+        ui.download(str(output_path), filename="result.drawio")
+    except Exception as e:
+        ui.notify(f"Ошибка при сохранении drawio: {e}", type="negative")
