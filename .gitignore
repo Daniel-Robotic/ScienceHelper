@@ -2,6 +2,8 @@
 __pycache__
 .venv
 venv
+.ruff_cache
+.vscode
 
 data/*.json
 data/*.pdf
